@@ -1,6 +1,6 @@
 (ns delimc.test.core
-  (:use [delimc.core] :reload)
-  (:use [clojure.test]))
+  (:require [delimc.core :refer :all]
+            [clojure.test :refer :all]))
 
 ;; not-seq
 (deftest not-seq-1
