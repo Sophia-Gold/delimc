@@ -59,3 +59,20 @@
                        n))]
     (is (= (squares (range 11))
            (map #(* % %) (range 11))))))
+
+(defn map-closure [c f g]
+  (conj (last g)
+        (mapv (fn [& args]
+                (conj ((lastf) (pop f) args)
+                      (last args)))
+              (pop g))))
+
+(defn substitute [x y & f]
+  (cond
+    (= y f) x
+    (seq? x) (conj (substitute x y (last f))
+                   (substitute x y (pop f)))
+    (fn? f) (map-closure (fn [& rest]
+                           (substitute x y (next f)))
+                         f)
+    :else f))
