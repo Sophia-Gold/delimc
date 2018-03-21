@@ -12,14 +12,20 @@
                    (shift k2
                           (k x)))))))))
 
-;; (defn yinyang []
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Yin Yang Puzzle
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;; (defn yin-yang []
 ;;   (let [yin ((fn [cc] (print "@") cc)
 ;;              (cwcc (fn [x] x)))
 ;;         yang ((fn [cc] (print "*") cc)
 ;;               (cwcc (fn [x] x)))]
 ;;     (yin yang)))
 
-;; (defn yinyang []
+;; (defn yin-yang []
 ;;   (letfn [(yin [x]
 ;;             (reset ((fn [cc] (print "@") cc)
 ;;                     (shift cc (cc x))))) 
@@ -28,51 +34,92 @@
 ;;                     (shift cc (cc x)))))] 
 ;;     (yin yang)))
 
-(defn yinyang []
+(defn yin-yang []
   (let [id (fn [k] (k k))] 
-    (id (fn [yin] (print "*")
-          (id (fn [yang] (print "@") 
+    (id (fn [yin]
+          (print "*")
+          (id (fn [yang]
+                (print "@") 
                 (yin yang)))))))
 
-;; (defn yinyang []
+;; (defn yin-yang []
 ;;   (letfn [(id [k] (k k))
-;;           (yin [] (id (fn [yin] (print "@") k)))
-;;           (yang [] (id (fn [yang] (print "*") (yin yang))))]
-;;     (trampoline yang)))
+;;           (yin [k] (print "*") (id k))
+;;           (yang [k] (print "@") (id k))] 
+;;     (trampoline (yin yang))))
 
-(defn f
-  [return]
-  (return 2)
-  3)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  CPS Transform
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn closure
-  [f]
-  (let [cont (atom nil)] 
-    (reset
-     (f (reset (shift x
-                      (reset! cont x)
-                      (x @cont)))))))
-  
-(deftest squares
-  (let [squares (fn [n] 
-                  (nth (map (closure #(* % %)) (range 11))
-                       n))]
-    (is (= (squares (range 11))
-           (map #(* % %) (range 11))))))
+(defn I& [x k]
+  (k x))
 
-(defn map-closure [c f g]
-  (conj (last g)
-        (mapv (fn [& args]
-                (conj ((lastf) (pop f) args)
-                      (last args)))
-              (pop g))))
+(defn N& [x k]
+  (print "@")
+  (k x))
 
-(defn substitute [x y & f]
-  (cond
-    (= y f) x
-    (seq? x) (conj (substitute x y (last f))
-                   (substitute x y (pop f)))
-    (fn? f) (map-closure (fn [& rest]
-                           (substitute x y (next f)))
-                         f)
-    :else f))
+(defn A& [x k]
+  (print "*")
+  (k x))
+
+(defn cwcc& [f& k]
+  (f& k k))
+
+(defn yin-yang&
+  "CPS Yin Yang"
+  [k]
+  (cwcc& I& (fn [cont1]
+              (N& cont1 (fn [yin]
+                          (cwcc I& (fn [cont2]
+                                     (A& cont2 (fn [yang]
+                                                 (k (yin yang)))))))))))
+
+(defn providecc&
+  "Same as `(fn [k] (k k))`"
+  [k]
+  (cwcc& I& k))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Closure Conversion
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro map-closure
+  [closure env]
+  (let [bound (second closure)]
+    (println bound)
+    (list* (first '~closure)
+            (conj bound ~env) 
+            (loop [exp# (first (nnext '~closure))
+                   env# ~env]
+              (conj (first exp#) 
+                    (map (fn [free# body#]
+                           (cond
+                             (and (symbol? body#)
+                                  (empty? (filter #(not= % body#) bound))) free#
+                             (list? body#) (recur body# env#)
+                             :else body#))
+                         env#
+                         (next exp#)))))))
+
+(defn map-closure2
+  [closure env]
+  (let [bound (second closure)]
+    (list* (first closure)
+           (conj bound env) 
+           (loop [exp (first (nnext closure))
+                  env env]
+             (conj (first exp)
+                   (map (fn [free body]
+                          (cond
+                            (and (symbol? body)
+                                 (empty? (filter #(= % body) bound))) free
+                            (list? body) (recur body env)
+                            :else body))
+                        env
+                        (next exp)))))))
+
