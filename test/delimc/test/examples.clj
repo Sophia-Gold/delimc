@@ -2,22 +2,24 @@
   (:require [delimc.core :refer :all]
             [clojure.test :refer :all]))
 
-(defn cwcc
-  "Scheme48 implementation of `call/cc` with shift/reset."
-  []
-  (reset
-   (fn [p]
-     (shift k (k (p
-                  (reset
-                   (fn [x]
-                     (shift k1 (k x))))))))))
-  
-;; (defn cwcc [p]
+(def cc (atom nil))
+
+(reset
+ (fn [p]
+   (shift k
+          (reset! cc k)
+          (k (p
+              (fn [x]
+                (shift k1 (p x))))))))
+
+;; (defn cwcc
+;;   "Scheme48 implementation of `call/cc` with shift/reset."
+;;   [p]
 ;;   (shift k
 ;;          (k (p
 ;;              (fn [x]
 ;;                (shift k1 (p x)))))))
-  
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;  Yin Yang Puzzle
@@ -26,12 +28,24 @@
 
 (defn id [x] (x x))
 
-(defn yin-yang-cc []
-  (let [yin ((fn [cc] (print "@") cc)
-             ((cwcc) id))
-        yang ((fn [cc] (print "*") cc)
-              ((cwcc) id))]
-    (yin yang)))
+(reset
+ (defn yin-yang-cc []
+   (letfn [(cwcc [p]
+             (shift k
+                    (k (p
+                        (fn [x]
+                          (shift k1 (p x)))))))
+           (yin [k] (print "*") k)
+           (yang [k] (print "@") k)] 
+     ((yin (cwcc id))
+      (yang (cwcc id))))))
+
+;; (defn yin-yang-cc []
+;;   (let [yin ((fn [cc] (print "@") cc)
+;;              (reset (cwcc id)))
+;;         yang ((fn [cc] (print "*") cc)
+;;               (reset (cwcc id)))]
+;;     (yin yang)))
 
 (defn yin-yang []
   (id (fn [yin]
