@@ -4,49 +4,46 @@
 
 (defn cwcc
   "Scheme48 implementation of `call/cc` with shift/reset."
-  [f]
+  []
   (reset
-   (shift k
-          (k (f (reset
-                 (fn [x] 
-                   (shift k2
-                          (k x)))))))))
-
+   (fn [p]
+     (shift k (k (p
+                  (reset
+                   (fn [x]
+                     (shift k1 (k x))))))))))
+  
+;; (defn cwcc [p]
+;;   (shift k
+;;          (k (p
+;;              (fn [x]
+;;                (shift k1 (p x)))))))
+  
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;;  Yin Yang Puzzle
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; (defn yin-yang []
-;;   (let [yin ((fn [cc] (print "@") cc)
-;;              (cwcc (fn [x] x)))
-;;         yang ((fn [cc] (print "*") cc)
-;;               (cwcc (fn [x] x)))]
-;;     (yin yang)))
+(defn id [x] (x x))
 
-;; (defn yin-yang []
-;;   (letfn [(yin [x]
-;;             (reset ((fn [cc] (print "@") cc)
-;;                     (shift cc (cc x))))) 
-;;           (yang [x]
-;;             (reset ((fn [cc] (print "*") cc)
-;;                     (shift cc (cc x)))))] 
-;;     (yin yang)))
+(defn yin-yang-cc []
+  (let [yin ((fn [cc] (print "@") cc)
+             ((cwcc) id))
+        yang ((fn [cc] (print "*") cc)
+              ((cwcc) id))]
+    (yin yang)))
 
 (defn yin-yang []
-  (let [id (fn [k] (k k))] 
-    (id (fn [yin]
-          (print "*")
-          (id (fn [yang]
-                (print "@") 
-                (yin yang)))))))
+  (id (fn [yin]
+        (print "*")
+        (id (fn [yang]
+              (print "@") 
+              (yin yang))))))
 
-;; (defn yin-yang []
-;;   (letfn [(id [k] (k k))
-;;           (yin [k] (print "*") (id k))
-;;           (yang [k] (print "@") (id k))] 
-;;     (trampoline (yin yang))))
+(defn yin-yang-trampoline []
+  (letfn [(yin [k] (print "*") (id k))
+          (yang [k] (print "@") (id k))] 
+    (trampoline yin yang)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -81,6 +78,13 @@
   "Same as `(fn [k] (k k))`"
   [k]
   (cwcc& I& k))
+
+(defn yin-yang-cps []
+  (providecc& (fn [yin]
+                (print "@")
+                (providecc& (fn [yang]
+                              (print "*")
+                              (yin yang))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -123,3 +127,32 @@
                         env
                         (next exp)))))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  Anaphora
+;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defmacro aif
+  "Paul Graham's anaphoric if from On-Lisp."
+  [expr & body]
+  `(let [~'it ~expr]
+     (if ~'it
+       (do ~@body))))
+
+(deftest nested-aif
+  (is (= (aif 42
+              (aif 38 [it it]))
+         [42 38])))
+;=> [38 38]
+
+(deftest nested-aif2
+  (is (= (aif 42
+              [it (aif 38 it)])
+         [42 38])))
+
+(deftest nested-if-let
+  (is (= (if-let [x 42]
+           (if-let [y 38]
+             [x y]))
+         [42 38])))
